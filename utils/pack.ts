@@ -8,49 +8,83 @@ type Size = {
 type Point = {
   x: number;
   y: number;
+  height: number;
+  width: number;
+  column: number;
 };
 
-type Lookup = Record<string, { size: [number, number]; color: string }>;
+type Lookup = Record<string, { size: [ number, number ]; color: string }>;
 
 // Need to also ensure within cutting grid - straight lines
 
+const itemAtMinTotalHeight = (points: Point[]) => {
+  // In each column get item at last row
+  const itemsAtLastRow = points.reduce((columns, point) => ({
+    ...columns,
+    [point.column]: point
+  }), {});
 
-// Build up co-ords backwards to use [head, ...tail] pattern
-const addNextLookupItem = (sheet: Size, lookup: Lookup) =>
-  ([head, ...tail]: { x: number; y: number; h?: number }[], item: string) => {
-    const [x, y] = lookup[item].size;
-
-    // Check if item fits - may need to adjust next co-ord
-    if (head.x + x <= sheet.width) {
-      return [{ x: head.x + x, y: head.y }, { ...head, h: y }, ...tail];
-    }
-
-    // Look for gaps in current row where current item can fit
-    const currentRowY = tail[0].y;
-    const currentRow = tail.filter((item) => item.y === currentRowY);
-    const gapIndex = currentRow.findIndex(cell => cell.y + (cell.h || 0) <= y);
-
-    if (gapIndex >= 0) {
-      // Gap found - need to adjust co-ords
-      const gapItem = currentRow[gapIndex];
-      const gapItemHeight = gapItem.h || 0;
-      gapItem.h = gapItemHeight + y;                                          // Update height to designate the gap as filled
-
-      tail.splice(gapIndex, 0, { x: gapItem.x, y: gapItemHeight, h: y });     // Mutates tail
-      return [head, ...tail];
-    } else {
-      // Start of new row
-      
-      // May need to adjust all previous row x spacers - invalidating current placements
-      
-      const currentRowMaxHeight = Math.max(...currentRow.map(({h = 0}) => h));
-      const startNextRow = head.y + currentRowMaxHeight;
-
-      return [{ x, y: startNextRow }, { x: 0, y: startNextRow, h: y }, ...tail];
-    }
+  // Find last item in row with min total height
+  return Object.values<Point>(itemsAtLastRow).reduce((acc, point) => ({
+    ...acc,
+    ...(acc.y + acc.height > point.y + point.height && point)
+  }), { y: 0, height: Infinity } as Point);
 };
 
-const extractPoint = ({ x, y }: { x: number; y: number }): [number, number] => [x, y];
+const getMaxWidthInColumn = (points: Point[], column: number) =>
+  Math.max(...points.filter(point => point.column === column).map(({ width }) => width));
+
+const shiftUpColumnsFrom = (points: Point[], fromColumn: number, offset: number) =>
+  points.reduce((acc, point) => [
+    ...acc,
+    {
+      ...point,
+      ...(point.column > fromColumn && { x: point.x + offset })
+    }
+  ], [] as Point[]);
+
+const addNextLookupItem = (sheet: Size, lookup: Lookup) => (points: Point[], item: string) => {
+  let { x = 0, y = 0, column = 0 } = points.pop() || {};
+  let [ width, height ] = lookup[item].size;
+
+  console.table(points)
+
+  if (x + width <= sheet.width && points.every(point => point.column !== column)) {
+    y = 0;  // Fits in sheet horizontally but column does not exist yet
+  } else {
+    const itemAtMinHeight = itemAtMinTotalHeight(points);
+
+    // Check if other columns need to be shifted up - and if still within bounds
+
+    // Update other items in this column's widths
+
+    const maxWidthInColumn = getMaxWidthInColumn(points, itemAtMinHeight.column);
+
+    if (width > maxWidthInColumn) {
+
+    // TODO: Check bounds 
+    //                      test: const options = [ 'a', 'b', 'a', 'a', 'b'];
+    //   to shift up, need offset amount left in sheet
+    //     i.e. check last column end + offset <= sheet.width
+
+      points = shiftUpColumnsFrom(points, itemAtMinHeight.column, width - maxWidthInColumn);
+    } else {
+      width = maxWidthInColumn;   // Need to update the next popped value's x
+    }
+
+    x = itemAtMinHeight.x;
+    y = itemAtMinHeight.y + itemAtMinHeight.height;
+    column = itemAtMinHeight.column;
+  }
+
+  return [
+    ...points,
+    { x, y, width, height, column },
+    { x: x + width, y: 0, width: 0, height: 0, column: column + 1 }
+  ];
+};
+
+const extractPoint = ({ x, y }: { x: number; y: number; }): [ number, number ] => [ x, y ];
 
 // Convert array of rectangles to a lookup of sizes, by id
 // E.g.: [{
@@ -79,16 +113,18 @@ export const getRectangles = (sheet: Size, rectangles: Rectangle[]) => {
   const addNextItem = addNextLookupItem(sheet, lookup);
 
   return (options: string[]) => {
-    const [, ...tail] = options.reduce(addNextItem, [{ x: 0, y: 0 }]);
+    const points = options.reduce(addNextItem, [ { x: 0, y: 0, width: 0, height: 0, column: 0 } ]);
+    points.pop();
 
-    return tail.reverse().map((item, index) => {
+    return points.map((item, index) => {
       const symbol = options[index];
       const { size, color } = lookup[symbol];
 
       return {
-        rectangle: [...extractPoint(item), ...size] as [number, number, number, number],
+        rectangle: [ ...extractPoint(item), ...size ] as [ number, number, number, number ],
         color,
-        symbol
+        symbol,
+        column: item.column
       };
     });
   };
