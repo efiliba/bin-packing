@@ -15,13 +15,11 @@ type Point = {
 
 type Lookup = Record<string, { size: [ number, number ]; color: string }>;
 
-// Need to also ensure within cutting grid - straight lines
-
-const itemAtMinTotalHeight = (points: Point[]) => {
+const itemAtMinTotalHeight = (points: Point[], ignoreColumn?: number) => {
   // In each column get item at last row
   const itemsAtLastRow = points.reduce((columns, point) => ({
     ...columns,
-    [point.column]: point
+    ...(point.column !== ignoreColumn && { [point.column]: point })
   }), {});
 
   // Find last item in row with min total height
@@ -34,6 +32,18 @@ const itemAtMinTotalHeight = (points: Point[]) => {
 const getMaxWidthInColumn = (points: Point[], column: number) =>
   Math.max(...points.filter(point => point.column === column).map(({ width }) => width));
 
+const getItemWithMaxWidthInLastColumn = (points: Point[]) => {
+  const itemWithMaxWidthInLastColumn = points.reduce((item, point) => ({
+    ...item,
+    ...(point.column > item.column && point.width > item.width &&  point)
+  }), { column: 0, width: 0, x: 0 });
+
+  return {
+    ...itemWithMaxWidthInLastColumn,
+    maxWidth: getMaxWidthInColumn(points, itemWithMaxWidthInLastColumn.column),
+  }
+};
+
 const shiftUpColumnsFrom = (points: Point[], fromColumn: number, offset: number) =>
   points.reduce((acc, point) => [
     ...acc,
@@ -43,45 +53,75 @@ const shiftUpColumnsFrom = (points: Point[], fromColumn: number, offset: number)
     }
   ], [] as Point[]);
 
-const addNextLookupItem = (sheet: Size, lookup: Lookup) => (points: Point[], item: string) => {
-  let { x = 0, y = 0, column = 0 } = points.pop() || {};
-  let [ width, height ] = lookup[item].size;
+const shiftNextColumnsAsRequired = (points: Point[], itemWidth: number, sheetWidth: number, ignoreColumn?: number) => {
+  // Get last item in the row that is the least vertically filled 
+  const itemAtMinHeight = itemAtMinTotalHeight(points, ignoreColumn);
 
-  console.table(points)
+  // Determine current max width of the column the new item will be added to
+  const maxWidthInColumn = getMaxWidthInColumn(points, itemAtMinHeight.column);
 
-  if (x + width <= sheet.width && points.every(point => point.column !== column)) {
-    y = 0;  // Fits in sheet horizontally but column does not exist yet
-  } else {
-    const itemAtMinHeight = itemAtMinTotalHeight(points);
+  let shiftedPoints: Point[] | undefined;
+  let overflowInColumn: number | undefined;
+  let width = itemWidth;
 
-    // Check if other columns need to be shifted up - and if still within bounds
+  if (width > maxWidthInColumn) {
+    // Rows to the right will need to be shifted
+    shiftedPoints = shiftUpColumnsFrom(points, itemAtMinHeight.column, width - maxWidthInColumn);
 
-    // Update other items in this column's widths
+    const lastColumnItem = getItemWithMaxWidthInLastColumn(shiftedPoints);    // last proposed column
 
-    const maxWidthInColumn = getMaxWidthInColumn(points, itemAtMinHeight.column);
-
-    if (width > maxWidthInColumn) {
-
-    // TODO: Check bounds 
-    //                      test: const options = [ 'a', 'b', 'a', 'a', 'b'];
-    //   to shift up, need offset amount left in sheet
-    //     i.e. check last column end + offset <= sheet.width
-
-      points = shiftUpColumnsFrom(points, itemAtMinHeight.column, width - maxWidthInColumn);
-    } else {
-      width = maxWidthInColumn;   // Need to update the next popped value's x
+    // Last column may no longer fit horizontally after right shifts
+    if (lastColumnItem.x + lastColumnItem.maxWidth > sheetWidth) {
+      overflowInColumn = itemAtMinHeight.column;
     }
-
-    x = itemAtMinHeight.x;
-    y = itemAtMinHeight.y + itemAtMinHeight.height;
-    column = itemAtMinHeight.column;
+  } else {
+    width = maxWidthInColumn;                                                 // Update the next popped value's x
   }
 
-  return [
-    ...points,
-    { x, y, width, height, column },
-    { x: x + width, y: 0, width: 0, height: 0, column: column + 1 }
-  ];
+  return {
+    x: itemAtMinHeight.x,
+    y: itemAtMinHeight.y + itemAtMinHeight.height,
+    column: itemAtMinHeight.column,
+    width,
+    shiftedPoints,
+    overflowInColumn
+  };
+};
+
+const addNextLookupItem = (sheet: Size, lookup: Lookup) => {
+  const addNextItem = (points: Point[], item: string, _?: number, __?: string[], ignoreColumn?: number): Point[] => {
+    let { x = 0, y = 0, column = 0 } = points.pop() || {};
+    let [ width, height ] = lookup[item].size;
+    let shiftedPoints: Point[] | undefined;
+    let overflowInColumn: number | undefined;
+
+    // Check if next item fits horizontally and column not created yet (empty)
+    if (x + width <= sheet.width && points.every(point => point.column !== column)) {
+      y = 0;                                                                  // New point will start at top row
+    } else {
+      ({ x, y, column, width, shiftedPoints, overflowInColumn } =
+        shiftNextColumnsAsRequired(points, width, sheet.width, ignoreColumn));
+    }
+
+    // If there is an overflow - re-add the item ignoring the problem column
+    if (overflowInColumn !== undefined) {
+      return addNextItem(
+        points.concat({ x: 0, y: 0, width: 0, height: 0, column: 0 }),
+        item,
+        undefined,
+        undefined,
+        overflowInColumn
+      );
+    }
+
+    return [
+      ...(shiftedPoints ?? points),
+      { x, y, width, height, column },
+      { x: x + width, y: 0, width: 0, height: 0, column: column + 1 }
+    ];
+  };
+
+  return addNextItem;
 };
 
 const extractPoint = ({ x, y }: { x: number; y: number; }): [ number, number ] => [ x, y ];
