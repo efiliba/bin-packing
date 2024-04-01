@@ -116,7 +116,7 @@ const addNextLookupItem = (sheet: Size, lookup: Lookup) => {
 
     return [
       ...(shiftedPoints ?? points),
-      { x, y, width, height, column },
+      ...(y + height <= sheet.height ? [{ x, y, width, height, column }] : []), // Only add point if it fits vertically
       { x: x + width, y: 0, width: 0, height: 0, column: column + 1 }
     ];
   };

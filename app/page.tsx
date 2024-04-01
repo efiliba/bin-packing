@@ -2,36 +2,37 @@
 
 import { useMemo } from 'react';
 
+import { Button } from "@/components/ui";
 import { useCanvas } from '@/hooks/useCanvas';
 import { permutations } from '@/utils/permutations';
 import { enumerateOptions, Rectangle } from '@/utils/options';
 import { getRectangles } from '@/utils/pack';
 
+import { AddItems } from '@/components';
+
 const resizeRect = (scaleX: number, scaleY: number) => ([ x, y, w, h ]: [ number, number, number, number ]) =>
   [ x * scaleX, y * scaleY, w * scaleX, h * scaleY ] as [ number, number, number, number ];
 
-const canvas = { width: 400, height: 600 };
+const sheet = { width: 40, height: 35 };
 
-const sheet = { width: 55, height: 60 };
+const canvas = { width: sheet.width * 10, height: sheet.height * 10 };
 
 export default function Home() {
   // Load rectangle sizes and quantities
   const rectangles: Rectangle[] = [{
     id: 'a',
     size: [20, 20],
-    quantity: 3,
+    quantity: 2,
     color: 'red'
   }, {
     id: 'b',
     size: [15, 15],
-    quantity: 1,
+    quantity: 2,
     color: 'blue'
   }];
 
-  // const options = permutations(enumerateOptions(rectangles)[0])[0];  // First option - test development of UI
-  // const options = [ 'b', 'a', 'a', 'b', 'b' ];
-  const options = [ 'a', 'b', 'a', 'a', 'b'];
-
+  const options = permutations(enumerateOptions(rectangles)[0])[0];  // First option - test development of UI
+  // const options = [ 'a', 'b', 'a', 'b'];
 
   const resize = useMemo(() => resizeRect(canvas.width / sheet.width, canvas.height / sheet.height), []);
 
@@ -66,6 +67,10 @@ export default function Home() {
       {getRectangles(sheet, rectangles)(options).map((rect, index) =>
         <div key={index}>{JSON.stringify(rect, null, 2)}</div>
       )}
+      <br />
+      <Button variant="destructive" onClick={() => console.log('clicked')}>Edit</Button>
+      <br />
+      <AddItems />
       <br />
       <canvas ref={canvasRef} className="border" width={canvas.width} height={canvas.height} />
     </main>
