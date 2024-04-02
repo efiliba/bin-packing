@@ -20,7 +20,7 @@
     --input: 20 5.9% 90%;
  
     --primary: 186 100% 39%;
-    --primary-foreground: 210 40% 98%;
+    --primary-foreground: 259 10% 10%;
  
     --secondary: 259 30% 50%;
     --secondary-foreground: 210 40% 98%; /* 222.2 47.4% 11.2%; */
@@ -74,7 +74,7 @@
 body {
   color: hsl(var(--foreground));
   background: hsl(var(--background));
-  padding-inline: 2rem;
+  padding-inline: 1rem;
 }
 
 @layer utilities {

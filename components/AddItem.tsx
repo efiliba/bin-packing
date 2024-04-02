@@ -1,4 +1,4 @@
-import { useState, useReducer, ChangeEvent } from 'react';
+import { useReducer, ChangeEvent } from 'react';
 
 import { Input } from '@/components/ui';
 
@@ -81,36 +81,30 @@ const reducer = (state: State, action: Action) => {
 };
 
 type Props = Partial<State> & {
-  onChange: (values: State) => void;
-  onAddNewRow: () => void;
+  color: string;
+  onWidthChange: (values: State) => void;
+  onHeightChange: (values: State) => void;
+  onQuantityChange: (values: State) => void;
 };
 
-export const AddItem = ({ width = 0, height = 0, quantity = 0, onChange, onAddNewRow }: Props) => {
-  const [ addedNewRow, setAddedNewRow ] = useState(quantity !== 0);
-
+export const AddItem = ({ width = 0, height = 0, quantity = 0, color, onWidthChange, onHeightChange, onQuantityChange }: Props) => {
   const [ state, dispatch ] = useReducer(reducer, { width, height, quantity });
 
   const handleWidthChange = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(ActionCreator.updateWidth(onChange)(e.target.valueAsNumber) as UpdateWidthActionCreator);
+    dispatch(ActionCreator.updateWidth(onWidthChange)(e.target.valueAsNumber) as UpdateWidthActionCreator);
 
   const handleHeightChange = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(ActionCreator.updateHeight(onChange)(e.target.valueAsNumber) as UpdateHeightActionCreator);
+    dispatch(ActionCreator.updateHeight(onHeightChange)(e.target.valueAsNumber) as UpdateHeightActionCreator);
 
   const handleQuantityChange = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(ActionCreator.updateQuantity(s => {
-      onChange(s);
+    dispatch(ActionCreator.updateQuantity(onQuantityChange)(e.target.valueAsNumber) as UpdateHeightQuantityCreator);
 
-      if (!addedNewRow) {
-        setAddedNewRow(true);
-        process.nextTick(onAddNewRow);
-      }
-    })(e.target.valueAsNumber) as UpdateHeightQuantityCreator);
-  
   return (
     <>
-      <Input type="number" min={0} value={state.width} onChange={handleWidthChange} />
-      <Input type="number" min={0} value={state.height} onChange={handleHeightChange} />
-      <Input type="number" min={0} value={state.quantity} onChange={handleQuantityChange} />
+      <div className="aspect-square" style={{ backgroundColor: color }} />
+      <Input className="text-right" type="number" min={0} value={state.width} onChange={handleWidthChange} />
+      <Input className="text-right" type="number" min={0} value={state.height} onChange={handleHeightChange} />
+      <Input className="text-right" type="number" min={0} value={state.quantity} onChange={handleQuantityChange} />
     </>
   );
 };

@@ -1,4 +1,4 @@
-import type { Rectangle } from '@/utils/options';
+import type { Rectangle } from '@/utils';
 
 type Size = {
   width: number;
@@ -152,7 +152,7 @@ export const getRectangles = (sheet: Size, rectangles: Rectangle[]) => {
   const lookup = toLookup(rectangles);
   const addNextItem = addNextLookupItem(sheet, lookup);
 
-  return (options: string[]) => {
+  return (options: string[] = []) => {
     const points = options.reduce(addNextItem, [ { x: 0, y: 0, width: 0, height: 0, column: 0 } ]);
     points.pop();
 

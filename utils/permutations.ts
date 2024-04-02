@@ -14,7 +14,7 @@ const removeItemAtIndex = <T>(items: T[], index: number) => {
 
 const enumeratePermutations = <T>(items: T[]): T[] | T[][] =>
   items.length === 1
-    ? items
+    ? [items]
     : items.reduce((permutations, item, index) =>
       [...permutations, ...distribute(item, enumeratePermutations(removeItemAtIndex(items, index)))]
     , [] as T[][]);
